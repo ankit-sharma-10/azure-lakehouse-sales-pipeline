@@ -1,0 +1,110 @@
+{
+    "name": "Pipeline_Incremental_Sales",
+    "properties": {
+        "activities": [
+            {
+                "name": "CopyLandingToRaw",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 3,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "DelimitedTextSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextWriteSettings",
+                            "quoteAllText": true,
+                            "fileExtension": ".csv"
+                        }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                },
+                "inputs": [
+                    {
+                        "referenceName": "landingCSV",
+                        "type": "DatasetReference"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "rawCSV",
+                        "type": "DatasetReference"
+                    }
+                ]
+            },
+            {
+                "name": "TransformLakehouse",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    {
+                        "activity": "CopyLandingToRaw",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 1,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebookPath": "/Users/<USER_EMAIL>/azure-lakehouse-sales-pipeline/src/main",
+                    "baseParameters": {
+                        "trigger_date": {
+                            "value": "@formatDateTime(pipeline().parameters.windowStart, 'yyyy-MM-dd')",
+                            "type": "Expression"
+                        },
+                        "pipeline_run_id": {
+                            "value": "@pipeline().RunId",
+                            "type": "Expression"
+                        },
+                        "processing_mode": "incremental"
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "AzureDatabricks",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "windowStart": {
+                "type": "string",
+                "defaultValue": "2026-04-13T00:00:00Z"
+            }
+        },
+        "annotations": []
+    }
+}
